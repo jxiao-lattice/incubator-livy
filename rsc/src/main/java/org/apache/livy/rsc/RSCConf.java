@@ -17,6 +17,8 @@
 
 package org.apache.livy.rsc;
 
+import org.apache.livy.client.common.ClientConf;
+
 import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
@@ -26,9 +28,8 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import javax.security.sasl.Sasl;
 
-import org.apache.livy.client.common.ClientConf;
+import javax.security.sasl.Sasl;
 
 public class RSCConf extends ClientConf<RSCConf> {
 
@@ -127,6 +128,10 @@ public class RSCConf extends ClientConf<RSCConf> {
       Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
       while (ifaces.hasMoreElements()) {
         NetworkInterface ni = ifaces.nextElement();
+        if (ni.getName().startsWith("utun")) {
+          LOG.warn("skip utun interface {}", ni.getName());
+          continue;
+        }
         Enumeration<InetAddress> addrs = ni.getInetAddresses();
         while (addrs.hasMoreElements()) {
           InetAddress addr = addrs.nextElement();

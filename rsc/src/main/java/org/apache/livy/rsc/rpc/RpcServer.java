@@ -17,16 +17,30 @@
 
 package org.apache.livy.rsc.rpc;
 
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.ChannelOption;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.util.concurrent.ScheduledFuture;
+import org.apache.livy.rsc.RSCConf;
+import org.apache.livy.rsc.Utils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.InetSocketAddress;
-import java.net.ServerSocket;
 import java.net.SocketException;
 import java.security.SecureRandom;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
+
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.CallbackHandler;
 import javax.security.auth.callback.NameCallback;
@@ -37,21 +51,12 @@ import javax.security.sasl.Sasl;
 import javax.security.sasl.SaslException;
 import javax.security.sasl.SaslServer;
 
-import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
-import io.netty.util.concurrent.ScheduledFuture;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import org.apache.livy.rsc.RSCConf;
-import org.apache.livy.rsc.Utils;
-import static org.apache.livy.rsc.RSCConf.Entry.*;
+import static org.apache.livy.rsc.RSCConf.Entry.LAUNCHER_PORT_RANGE;
+import static org.apache.livy.rsc.RSCConf.Entry.RPC_CLIENT_HANDSHAKE_TIMEOUT;
+import static org.apache.livy.rsc.RSCConf.Entry.RPC_MAX_THREADS;
+import static org.apache.livy.rsc.RSCConf.Entry.RPC_SECRET_RANDOM_BITS;
+import static org.apache.livy.rsc.RSCConf.Entry.RPC_SERVER_ADDRESS;
+import static org.apache.livy.rsc.RSCConf.Entry.SASL_MECHANISMS;
 
 /**
  * An RPC server. The server matches remote clients based on a secret that is generated on
@@ -105,7 +110,12 @@ public class RpcServer implements Closeable {
     LOG.info("Connected to the port " + this.port);
     String address = config.get(RPC_SERVER_ADDRESS);
     if (address == null) {
-      address = config.findLocalAddress();
+      String serverAddrInEnv = System.getenv("LIVY_RPC_SERVER_ADDRESS");
+      if (serverAddrInEnv == null || serverAddrInEnv.length() == 0) {
+        address = config.findLocalAddress();
+      } else {
+        address = serverAddrInEnv;
+      }
     }
     this.address = address;
   }
